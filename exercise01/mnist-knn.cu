@@ -7,6 +7,21 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <cuda.h>
+#include <inttypes.h>
+
+#define BLOCKSIZE 32
+#define NUM_BLOCKS 1875
+
+__global__ void computeDistances(float *testimage, float *trainimages, float *dist, unsigned int width, unsigned int height) {
+	unsigned int image_id = blockIdx.x * blockDim.x + threadIdx.x;
+	float sum = 0.0f;
+	for (unsigned int i = 0; i < width * height; i++) {
+		float factor = testimage[i] - trainimages[image_id * width * height + i];
+		sum += factor * factor;
+	}
+	dist[image_id] = sqrt(sum);
+}
 
 #define TRAIN_IMAGES_FILE "train-images-idx3-ubyte"
 #define TRAIN_LABELS_FILE "train-labels-idx1-ubyte"
@@ -27,10 +42,10 @@ struct dist {
   int i;
 };
 
-unsigned char train_img[NUM_TRAIN_IMAGES][WIDTH * HEIGHT];
-unsigned char train_label[NUM_TRAIN_IMAGES];
+float train_img[NUM_TRAIN_IMAGES * WIDTH * HEIGHT];
+uint8_t train_label[NUM_TRAIN_IMAGES];
 
-unsigned char test_img[NUM_TEST_IMAGES][WIDTH * HEIGHT];
+float test_img[NUM_TEST_IMAGES * WIDTH * HEIGHT];
 unsigned char test_label[NUM_TEST_IMAGES];
 
 struct dist dists[NUM_TRAIN_IMAGES];
@@ -42,7 +57,7 @@ int dist_cmp_func(const void *a, const void *b)
   return da->dist - db->dist;
 }
 
-float euclid_dist(int a, int b)
+/*float euclid_dist(int a, int b)
 {
   unsigned int sum = 0.0;
 
@@ -54,7 +69,7 @@ float euclid_dist(int a, int b)
   }
 
   return sqrt(sum);
-}
+}*/
 
 void read_files()
 {
@@ -73,10 +88,15 @@ void read_files()
   read(img_fd, &train_img, 4 * sizeof(int));
   read(label_fd, &train_img, 2 * sizeof(int));
 
-  int i;
+  int i, j;
   for(i = 0; i < NUM_TRAIN_IMAGES; i++)
   {
-    read(img_fd, &train_img[i], WIDTH * HEIGHT);
+	  uint8_t val = 0;
+	  for (j = 0; j < WIDTH * HEIGHT; j++) {
+		  read(img_fd, &val, 1);
+		  train_img[i*WIDTH*HEIGHT + j] = (float) val;
+	  }
+
     read(label_fd, &train_label[i], 1);
   }
 
@@ -97,7 +117,11 @@ void read_files()
 
   for(i = 0; i < NUM_TEST_IMAGES; i++)
   {
-    read(img_fd, &test_img[i], WIDTH * HEIGHT);
+	  uint8_t val = 0;
+	  for (j = 0; j < WIDTH * HEIGHT; j++) {
+		  read(img_fd, &val, 1);
+		  test_img[i*WIDTH*HEIGHT + j] = (float) val;
+	  }
     read(label_fd, &test_label[i], 1);
   }
 
@@ -111,9 +135,16 @@ void write_images(int ref)
   char header[1024];
 
   snprintf(header, 1024, "P5\n%d %d 255\n", WIDTH, HEIGHT);
-
+  uint8_t tmp_test_img[NUM_TEST_IMAGES * WIDTH * HEIGHT];
+  uint8_t tmp_train_img[NUM_TRAIN_IMAGES * WIDTH * HEIGHT];
+  for (unsigned int i = 0; i < NUM_TRAIN_IMAGES * WIDTH * HEIGHT; i++) {
+  	tmp_train_img[i] = (uint8_t) train_img[i];
+  }
+  for (unsigned int i = 0; i < NUM_TEST_IMAGES * WIDTH * HEIGHT; i++) {
+  	tmp_test_img[i] = (uint8_t) test_img[i];
+  }
   write(fd, header, strlen(header));
-  write(fd, test_img[ref], WIDTH * HEIGHT);
+  write(fd, tmp_test_img, NUM_TEST_IMAGES * WIDTH * HEIGHT);
 
   close(fd);
 
@@ -127,7 +158,7 @@ void write_images(int ref)
     snprintf(header, 1024, "P5\n%d %d 255\n", WIDTH, HEIGHT);
 
     write(fd, header, strlen(header));
-    write(fd, train_img[dists[k].i], WIDTH * HEIGHT);
+    write(fd, &tmp_train_img[dists[k].i * WIDTH * HEIGHT], WIDTH * HEIGHT);
 
     close(fd);
   }
@@ -137,18 +168,44 @@ int main()
 {
   read_files();
 
+  cudaSetDevice(1);
   int freqs[10];
   int num_correct = 0;
 
   int ref;
+
+  float *d_dists;
+  float *d_images;
+  float *d_testimage;
+
+  cudaMalloc(&d_images, NUM_TRAIN_IMAGES*WIDTH*HEIGHT*sizeof(float));
+  cudaMalloc(&d_dists, NUM_TRAIN_IMAGES*sizeof(float));
+  cudaMalloc(&d_testimage, WIDTH*HEIGHT*sizeof(float));
+
+  cudaMemcpy(d_images, train_img, NUM_TRAIN_IMAGES*WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
+
   for(ref = 0; ref < NUM_CLASSIFICATIONS; ref++)
   {
     int i;
-    for(i = 0; i < NUM_TRAIN_IMAGES; i++)
+    /*for(i = 0; i < NUM_TRAIN_IMAGES; i++)
     {
       dists[i].dist = euclid_dist(i, ref);
       dists[i].label = train_label[i];
       dists[i].i = i;
+    }*/
+
+    cudaMemcpy(d_testimage, &test_img[ref*WIDTH*HEIGHT], WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
+
+    computeDistances<<<NUM_BLOCKS, BLOCKSIZE>>>(d_testimage, d_images, d_dists, WIDTH, HEIGHT);
+
+    float tmp_dists[NUM_TRAIN_IMAGES];
+    cudaMemcpy(tmp_dists, d_dists, NUM_TRAIN_IMAGES*sizeof(float), cudaMemcpyDeviceToHost);
+
+    for(i = 0; i < NUM_TRAIN_IMAGES; i++)
+    {
+    	dists[i].dist = tmp_dists[i];
+    	dists[i].label = train_label[i];
+        dists[i].i = i;
     }
 
     qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
@@ -178,6 +235,9 @@ int main()
     // write_images(ref); // for debugging
   }
 
+  cudaFree(d_images);
+  cudaFree(d_dists);
+  cudaFree(d_testimage);
   printf("Accuracy: %.2f\n", (float)num_correct / NUM_CLASSIFICATIONS);
 
   return 0;
