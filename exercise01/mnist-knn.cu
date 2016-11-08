@@ -57,19 +57,19 @@ int dist_cmp_func(const void *a, const void *b)
   return da->dist - db->dist;
 }
 
-/*float euclid_dist(int a, int b)
+float euclid_dist(int a, int b)
 {
-  unsigned int sum = 0.0;
+  float sum = 0.0f;
 
   int i = 0;
   for(i = 0; i < WIDTH * HEIGHT; i++)
   {
-    int factor = train_img[a][i] - test_img[b][i];
+    int factor = train_img[a * WIDTH * HEIGHT + i] - test_img[b * WIDTH * HEIGHT + i];
     sum += factor * factor;
   }
 
   return sqrt(sum);
-}*/
+}
 
 void read_files()
 {
@@ -164,10 +164,16 @@ void write_images(int ref)
   }
 }
 
-int main()
+int main(int argc, char **argv)
 {
+  printf("Reading files...\n");
   read_files();
-
+  printf("Files read.\n");
+  int parallel = 0;
+  if (argc > 1 && argv[1][0] == 'p') {
+	  printf("Selected parallel computation.\n");
+	  parallel = 1;
+  }
   cudaSetDevice(1);
   int freqs[10];
   int num_correct = 0;
@@ -184,28 +190,30 @@ int main()
 
   cudaMemcpy(d_images, train_img, NUM_TRAIN_IMAGES*WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
 
+  printf("Starting classifications...\n");
+  clock_t begin = clock();
   for(ref = 0; ref < NUM_CLASSIFICATIONS; ref++)
   {
     int i;
-    /*for(i = 0; i < NUM_TRAIN_IMAGES; i++)
-    {
-      dists[i].dist = euclid_dist(i, ref);
-      dists[i].label = train_label[i];
-      dists[i].i = i;
-    }*/
+    if (!parallel) {
+    	for(i = 0; i < NUM_TRAIN_IMAGES; i++)
+    	{
+    		dists[i].dist = euclid_dist(i, ref);
+    		dists[i].label = train_label[i];
+    		dists[i].i = i;
+    	}
+    } else {
+    	cudaMemcpy(d_testimage, &test_img[ref*WIDTH*HEIGHT], WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
+    	computeDistances<<<NUM_BLOCKS, BLOCKSIZE>>>(d_testimage, d_images, d_dists, WIDTH, HEIGHT);
+    	float tmp_dists[NUM_TRAIN_IMAGES];
+    	cudaMemcpy(tmp_dists, d_dists, NUM_TRAIN_IMAGES*sizeof(float), cudaMemcpyDeviceToHost);
 
-    cudaMemcpy(d_testimage, &test_img[ref*WIDTH*HEIGHT], WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
-
-    computeDistances<<<NUM_BLOCKS, BLOCKSIZE>>>(d_testimage, d_images, d_dists, WIDTH, HEIGHT);
-
-    float tmp_dists[NUM_TRAIN_IMAGES];
-    cudaMemcpy(tmp_dists, d_dists, NUM_TRAIN_IMAGES*sizeof(float), cudaMemcpyDeviceToHost);
-
-    for(i = 0; i < NUM_TRAIN_IMAGES; i++)
-    {
-    	dists[i].dist = tmp_dists[i];
-    	dists[i].label = train_label[i];
-        dists[i].i = i;
+    	for(i = 0; i < NUM_TRAIN_IMAGES; i++)
+    	{
+    		dists[i].dist = tmp_dists[i];
+    		dists[i].label = train_label[i];
+    		dists[i].i = i;
+    	}
     }
 
     qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
@@ -228,13 +236,14 @@ int main()
       }
     }
 
-    printf("Guessed label: %d (%.2f%% of %d nearest). Actual label is %d%s\n", max_i, (float)max * 100.0 / K, K, test_label[ref], max_i == test_label[ref] ? ": correct": "");
+    //printf("Guessed label: %d (%.2f%% of %d nearest). Actual label is %d%s\n", max_i, (float)max * 100.0 / K, K, test_label[ref], max_i == test_label[ref] ? ": correct": "");
     if(max_i == test_label[ref])
       num_correct++;
 
     // write_images(ref); // for debugging
   }
-
+  clock_t end = clock();
+  printf("Classification finished, CPU-time: %f\n", (double) (end - begin) / CLOCKS_PER_SEC);
   cudaFree(d_images);
   cudaFree(d_dists);
   cudaFree(d_testimage);
