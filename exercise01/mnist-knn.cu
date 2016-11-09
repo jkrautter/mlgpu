@@ -43,9 +43,11 @@ struct dist {
 };
 
 float train_img[NUM_TRAIN_IMAGES * WIDTH * HEIGHT];
+uint8_t train_img_byte[NUM_TRAIN_IMAGES][WIDTH * HEIGHT];
 uint8_t train_label[NUM_TRAIN_IMAGES];
 
 float test_img[NUM_TEST_IMAGES * WIDTH * HEIGHT];
+uint8_t test_img_byte[NUM_TEST_IMAGES][WIDTH * HEIGHT];
 unsigned char test_label[NUM_TEST_IMAGES];
 
 struct dist dists[NUM_TRAIN_IMAGES];
@@ -59,12 +61,12 @@ int dist_cmp_func(const void *a, const void *b)
 
 float euclid_dist(int a, int b)
 {
-  float sum = 0.0f;
+  int sum = 0;
 
   int i = 0;
   for(i = 0; i < WIDTH * HEIGHT; i++)
   {
-    int factor = train_img[a * WIDTH * HEIGHT + i] - test_img[b * WIDTH * HEIGHT + i];
+    int factor = train_img_byte[a][i] - test_img_byte[b][i];
     sum += factor * factor;
   }
 
@@ -95,6 +97,7 @@ void read_files()
 	  for (j = 0; j < WIDTH * HEIGHT; j++) {
 		  read(img_fd, &val, 1);
 		  train_img[i*WIDTH*HEIGHT + j] = (float) val;
+		  train_img_byte[i][j] = val;
 	  }
 
     read(label_fd, &train_label[i], 1);
@@ -121,6 +124,7 @@ void read_files()
 	  for (j = 0; j < WIDTH * HEIGHT; j++) {
 		  read(img_fd, &val, 1);
 		  test_img[i*WIDTH*HEIGHT + j] = (float) val;
+		  test_img_byte[i][j] = val;
 	  }
     read(label_fd, &test_label[i], 1);
   }
@@ -135,16 +139,9 @@ void write_images(int ref)
   char header[1024];
 
   snprintf(header, 1024, "P5\n%d %d 255\n", WIDTH, HEIGHT);
-  uint8_t tmp_test_img[NUM_TEST_IMAGES * WIDTH * HEIGHT];
-  uint8_t tmp_train_img[NUM_TRAIN_IMAGES * WIDTH * HEIGHT];
-  for (unsigned int i = 0; i < NUM_TRAIN_IMAGES * WIDTH * HEIGHT; i++) {
-  	tmp_train_img[i] = (uint8_t) train_img[i];
-  }
-  for (unsigned int i = 0; i < NUM_TEST_IMAGES * WIDTH * HEIGHT; i++) {
-  	tmp_test_img[i] = (uint8_t) test_img[i];
-  }
+
   write(fd, header, strlen(header));
-  write(fd, tmp_test_img, NUM_TEST_IMAGES * WIDTH * HEIGHT);
+  write(fd, test_img_byte[ref], WIDTH * HEIGHT);
 
   close(fd);
 
@@ -158,7 +155,7 @@ void write_images(int ref)
     snprintf(header, 1024, "P5\n%d %d 255\n", WIDTH, HEIGHT);
 
     write(fd, header, strlen(header));
-    write(fd, &tmp_train_img[dists[k].i * WIDTH * HEIGHT], WIDTH * HEIGHT);
+    write(fd, train_img_byte[dists[k].i], WIDTH * HEIGHT);
 
     close(fd);
   }
@@ -192,6 +189,7 @@ int main(int argc, char **argv)
 
   printf("Starting classifications...\n");
   clock_t begin = clock();
+  time_t begin_t = time(NULL);
   for(ref = 0; ref < NUM_CLASSIFICATIONS; ref++)
   {
     int i;
@@ -243,7 +241,8 @@ int main(int argc, char **argv)
     // write_images(ref); // for debugging
   }
   clock_t end = clock();
-  printf("Classification finished, CPU-time: %f\n", (double) (end - begin) / CLOCKS_PER_SEC);
+  time_t end_t = time(NULL);
+  printf("Classification finished, CPU-time: %fs, user time: %lds\n", (double) (end - begin) / CLOCKS_PER_SEC, end_t - begin_t);
   cudaFree(d_images);
   cudaFree(d_dists);
   cudaFree(d_testimage);
