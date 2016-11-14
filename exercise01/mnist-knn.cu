@@ -9,6 +9,8 @@
 #include <string.h>
 #include <cuda.h>
 #include <inttypes.h>
+#include <thrust/sort.h>
+#include <thrust/execution_policy.h>
 
 #define BLOCKSIZE 32
 #define NUM_BLOCKS 1875
@@ -167,10 +169,15 @@ int main(int argc, char **argv)
   read_files();
   printf("Files read.\n");
   int parallel = 0;
+  int sort=0;
   if (argc > 1 && argv[1][0] == 'p') {
 	  printf("Selected parallel computation.\n");
 	  parallel = 1;
   }
+  if (argc>2 && argv[2][0]== 't'){
+          printf("use thrust sort.\n");
+          sort = 1;
+}
   cudaSetDevice(1);
   int freqs[10];
   int num_correct = 0;
@@ -181,9 +188,13 @@ int main(int argc, char **argv)
   float *d_images;
   float *d_testimage;
 
+  float  keys[NUM_TRAIN_IMAGES];
+  unsigned  char values[NUM_TRAIN_IMAGES];
+
   cudaMalloc(&d_images, NUM_TRAIN_IMAGES*WIDTH*HEIGHT*sizeof(float));
   cudaMalloc(&d_dists, NUM_TRAIN_IMAGES*sizeof(float));
   cudaMalloc(&d_testimage, WIDTH*HEIGHT*sizeof(float));
+
 
   cudaMemcpy(d_images, train_img, NUM_TRAIN_IMAGES*WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
 
@@ -213,9 +224,26 @@ int main(int argc, char **argv)
     		dists[i].i = i;
     	}
     }
+    
+    if(sort){
 
+    for (i = 0; i < NUM_TRAIN_IMAGES; i++)
+    { //printf("%c\n",dists[i].label);
+          keys[i] = dists[i].dist;
+          values[i] = dists[i].label;       
+    }
+    thrust::stable_sort_by_key(thrust::host, keys, keys + NUM_TRAIN_IMAGES, values);
+    //qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
+
+    for (i=0;i< NUM_TRAIN_IMAGES; i++)
+    {
+           dists[i].dist = keys[i];
+          dists[i].label = values[i];
+    }
+}
+    else {
     qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
-
+}
     for(i = 0; i < 10; i++)
       freqs[i] = 0;
 
