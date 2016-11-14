@@ -201,6 +201,7 @@ int main(int argc, char **argv)
   printf("Starting classifications...\n");
   clock_t begin = clock();
   time_t begin_t = time(NULL);
+  float tmp_dists[NUM_TRAIN_IMAGES];
   for(ref = 0; ref < NUM_CLASSIFICATIONS; ref++)
   {
     int i;
@@ -214,7 +215,7 @@ int main(int argc, char **argv)
     } else {
     	cudaMemcpy(d_testimage, &test_img[ref*WIDTH*HEIGHT], WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
     	computeDistances<<<NUM_BLOCKS, BLOCKSIZE>>>(d_testimage, d_images, d_dists, WIDTH, HEIGHT);
-    	float tmp_dists[NUM_TRAIN_IMAGES];
+    	//float tmp_dists[NUM_TRAIN_IMAGES];
     	cudaMemcpy(tmp_dists, d_dists, NUM_TRAIN_IMAGES*sizeof(float), cudaMemcpyDeviceToHost);
 
     	for(i = 0; i < NUM_TRAIN_IMAGES; i++)
@@ -227,19 +228,19 @@ int main(int argc, char **argv)
     
     if(sort){
 
-    for (i = 0; i < NUM_TRAIN_IMAGES; i++)
-    { //printf("%c\n",dists[i].label);
-          keys[i] = dists[i].dist;
-          values[i] = dists[i].label;       
-    }
-    thrust::stable_sort_by_key(thrust::host, keys, keys + NUM_TRAIN_IMAGES, values);
+    //for (i = 0; i < NUM_TRAIN_IMAGES; i++)
+    //{ //printf("%c\n",dists[i].label);
+    //      keys[i] = dists[i].dist;
+      //    values[i] = dists[i].label;       
+    //}
+    thrust::stable_sort_by_key(thrust::device, tmp_dists, tmp_dists + NUM_TRAIN_IMAGES, train_label);
     //qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
 
-    for (i=0;i< NUM_TRAIN_IMAGES; i++)
-    {
-           dists[i].dist = keys[i];
-          dists[i].label = values[i];
-    }
+    //for (i=0;i< NUM_TRAIN_IMAGES; i++)
+    //{
+    //       dists[i].dist = keys[i];
+    //      dists[i].label = values[i];
+    //}
 }
     else {
     qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
