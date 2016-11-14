@@ -15,16 +15,6 @@
 #define BLOCKSIZE 32
 #define NUM_BLOCKS 1875
 
-__global__ void computeDistances(float *testimage, float *trainimages, float *dist, unsigned int width, unsigned int height) {
-	unsigned int image_id = blockIdx.x * blockDim.x + threadIdx.x;
-	float sum = 0.0f;
-	for (unsigned int i = 0; i < width * height; i++) {
-		float factor = testimage[i] - trainimages[image_id * width * height + i];
-		sum += factor * factor;
-	}
-	dist[image_id] = sqrt(sum);
-}
-
 #define TRAIN_IMAGES_FILE "train-images-idx3-ubyte"
 #define TRAIN_LABELS_FILE "train-labels-idx1-ubyte"
 
@@ -37,6 +27,26 @@ __global__ void computeDistances(float *testimage, float *trainimages, float *di
 #define NUM_TEST_IMAGES 10000
 #define K 10
 #define NUM_CLASSIFICATIONS 10000
+
+__global__ void computeDistances(float *testimage, float *trainimages, float *dist) {
+	__shared__ float local_testimage[WIDTH*HEIGHT];
+	unsigned int part = (WIDTH*HEIGHT)/blockDim.x;
+	for (unsigned int i = 0; i < part && (threadIdx.x*part + i) < WIDTH*HEIGHT; i++) {
+		local_testimage[part * threadIdx.x + i] = testimage[part * threadIdx.x + i];
+	}
+	unsigned int image_id = blockIdx.x * blockDim.x + threadIdx.x;
+	float sum = 0.0f;
+	for (unsigned int i = 0; i < WIDTH * HEIGHT; i++) {
+		float factor = local_testimage[i] - trainimages[image_id * WIDTH * HEIGHT + i];
+		sum += factor * factor;
+	}
+	dist[image_id] = sqrt(sum);
+}
+
+__global__ void setIds(unsigned int *trainids) {
+	unsigned int id = blockIdx.x * blockDim.x + threadIdx.x;
+	trainids[id] = id;
+}
 
 struct dist {
   float dist;
@@ -169,15 +179,10 @@ int main(int argc, char **argv)
   read_files();
   printf("Files read.\n");
   int parallel = 0;
-  int sort=0;
   if (argc > 1 && argv[1][0] == 'p') {
 	  printf("Selected parallel computation.\n");
 	  parallel = 1;
   }
-  if (argc>2 && argv[2][0]== 't'){
-          printf("use thrust sort.\n");
-          sort = 1;
-}
   cudaSetDevice(1);
   int freqs[10];
   int num_correct = 0;
@@ -187,24 +192,24 @@ int main(int argc, char **argv)
   float *d_dists;
   float *d_images;
   float *d_testimage;
-
-  float  keys[NUM_TRAIN_IMAGES];
-  unsigned  char values[NUM_TRAIN_IMAGES];
+  unsigned int *d_trainids;
+  unsigned int tmp_trainids[NUM_TRAIN_IMAGES];
 
   cudaMalloc(&d_images, NUM_TRAIN_IMAGES*WIDTH*HEIGHT*sizeof(float));
   cudaMalloc(&d_dists, NUM_TRAIN_IMAGES*sizeof(float));
   cudaMalloc(&d_testimage, WIDTH*HEIGHT*sizeof(float));
-
+  cudaMalloc(&d_trainids, NUM_TRAIN_IMAGES*sizeof(unsigned int));
 
   cudaMemcpy(d_images, train_img, NUM_TRAIN_IMAGES*WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
 
   printf("Starting classifications...\n");
   clock_t begin = clock();
   time_t begin_t = time(NULL);
-  float tmp_dists[NUM_TRAIN_IMAGES];
   for(ref = 0; ref < NUM_CLASSIFICATIONS; ref++)
   {
     int i;
+    for(i = 0; i < 10; i++)
+    freqs[i] = 0;    
     if (!parallel) {
     	for(i = 0; i < NUM_TRAIN_IMAGES; i++)
     	{
@@ -212,45 +217,19 @@ int main(int argc, char **argv)
     		dists[i].label = train_label[i];
     		dists[i].i = i;
     	}
+	qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
+    	for(i = 0; i < K; i++)
+      		freqs[dists[i].label]++;
     } else {
     	cudaMemcpy(d_testimage, &test_img[ref*WIDTH*HEIGHT], WIDTH*HEIGHT*sizeof(float), cudaMemcpyHostToDevice);
-    	computeDistances<<<NUM_BLOCKS, BLOCKSIZE>>>(d_testimage, d_images, d_dists, WIDTH, HEIGHT);
-    	//float tmp_dists[NUM_TRAIN_IMAGES];
-    	cudaMemcpy(tmp_dists, d_dists, NUM_TRAIN_IMAGES*sizeof(float), cudaMemcpyDeviceToHost);
-
-    	for(i = 0; i < NUM_TRAIN_IMAGES; i++)
-    	{
-    		dists[i].dist = tmp_dists[i];
-    		dists[i].label = train_label[i];
-    		dists[i].i = i;
-    	}
+    	computeDistances<<<NUM_BLOCKS, BLOCKSIZE>>>(d_testimage, d_images, d_dists);
+	setIds<<<NUM_BLOCKS, BLOCKSIZE>>>(d_trainids);
+    	thrust::stable_sort_by_key(thrust::device, d_dists, d_dists + NUM_TRAIN_IMAGES - 1, d_trainids);
+	cudaMemcpy(tmp_trainids, d_trainids, NUM_TRAIN_IMAGES*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+	for(i = 0; i < K; i++)
+    		freqs[train_label[tmp_trainids[i]]]++;
     }
-    
-    if(sort){
-
-    //for (i = 0; i < NUM_TRAIN_IMAGES; i++)
-    //{ //printf("%c\n",dists[i].label);
-    //      keys[i] = dists[i].dist;
-      //    values[i] = dists[i].label;       
-    //}
-    thrust::stable_sort_by_key(thrust::device, tmp_dists, tmp_dists + NUM_TRAIN_IMAGES, train_label);
-    //qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
-
-    //for (i=0;i< NUM_TRAIN_IMAGES; i++)
-    //{
-    //       dists[i].dist = keys[i];
-    //      dists[i].label = values[i];
-    //}
-}
-    else {
-    qsort(dists, NUM_TRAIN_IMAGES, sizeof(struct dist), dist_cmp_func);
-}
-    for(i = 0; i < 10; i++)
-      freqs[i] = 0;
-
-    for(i = 0; i < K; i++)
-      freqs[dists[i].label]++;
-
+	
     int max = 0;
     int max_i = 0;
 
