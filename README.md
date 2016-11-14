@@ -1,5 +1,5 @@
 # mlgpu
 
 ### 2 parameters:
-- p: parallel computer dist
+- p: parallel compute dist
 - t: use thrust sort (parallel)
