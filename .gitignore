@@ -2,4 +2,12 @@
 *.cproject
 *.settings
 *.o
+*__pycache__
+*.pydevproject
 exercise01/mnist-knn
+exercise03/digits-dataset2-labels.txt
+exercise03/digits-dataset2-unlabeled.txt
+exercise03/digits-dataset1-labeled.txt
+exercise03/letters-dataset2-labels.txt
+exercise03/letters-dataset2-unlabeled.txt
+exercise03/letters-dataset1-labeled.txt
