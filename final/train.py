@@ -17,10 +17,10 @@ import ConfigParser
 import random
 import time
 from six.moves import xrange
-import util.dataprocessor
+#import util.dataprocessor
 import util.hyperparams as hyperparams
 import models.sentiment
-import preprocessing.dataset.DataSet as DataSet
+from preprocessing.dataset import  DataSet
 
 #Defaults for network parameters
 
@@ -32,10 +32,10 @@ flags.DEFINE_string("checkpoint_dir", "data/checkpoints/", "Directory to store/r
 
 def main():
 	hyper_params = check_get_hyper_param_dic()
-	util.dataprocessor.run(hyper_params["max_seq_length"],
-		hyper_params["max_vocab_size"])
+#	util.dataprocessor.run(hyper_params["max_seq_length"],
+#		hyper_params["max_vocab_size"])
 	
-	dataset = DataSet()
+	dataset = DataSet("/home/t2/data/", "/home/t2/")
 
 	#create model
 	print "Creating model with..."
@@ -44,11 +44,11 @@ def main():
 	print "Dropout: {0}".format(hyper_params["dropout"])
 	vocab_size = dataset.getVocabSize()
 	print "Vocab size is: {0}".format(vocab_size)
-	path = os.path.join(FLAGS.data_dir, "processed/")
-	infile = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+#	path = os.path.join(FLAGS.data_dir, "processed/")
+#	infile = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
 	#randomize data order
-	print infile
-	data = dataset.getDatasetFor(basecompany, max_sequence_length)
+#	print infile
+	data = dataset.getDatasetFor(90053, 25)
 	np.random.shuffle(data)
 	#data = data[:3000]
 	num_batches = len(data) / hyper_params["batch_size"]
