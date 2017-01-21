@@ -149,6 +149,12 @@ class DataSet:
             result = c.fetchone()
             words.append(result[0])
         return str(words)
+    
+    def getVocabSize(self):
+        c = self.conn.cursor()
+        c.execute("SELECT count(`wid`) FROM `vocab`")
+        result = c.fetchone()
+        return int(result[0])
         
     def getDatasetFor(self, basecompany, max_sequence_length):
         t = (basecompany,)
@@ -157,27 +163,23 @@ class DataSet:
         result = c.fetchone()
         name = result[0]
         print("Selected basecompany " + name + ", loading data...\n")
-        c.execute("SELECT c.`num`, d.`seqvec` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid` WHERE `basecid`=?", t)
+        c.execute("SELECT c.`num`, d.`seqvec`, d.`len` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid` WHERE `basecid`=?", t)
         result = c.fetchall()
         print("Found " + str(len(result)) + " sentences including this basecompany.\n")
         c.execute("SELECT COUNT(`wid`) FROM `vocab`")
         tempresult = c.fetchone()
         numwords = int(tempresult[0])
-        c.execute("SELECT COUNT(`cid`) FROM `companies`")
-        tempresult = c.fetchone()
-        numtargets = int(tempresult[0])
-        targets = []
-        sequences = []
+        datalist = numpy.zeros(shape=(len(result), max_sequence_length + 2), dtype=numpy.int32)
+        count = 0
         for r in result:
-            target = numpy.zeros(numtargets, dtype=numpy.float32)
-            target[r[0]] = 1.0
-            targets.append(target)
             wordlist = pickle.loads(r[1])
-            if len(wordlist) > max_sequence_length:
-                wordlist = wordlist[0:max_sequence_length]
-            else:
-                for j in range(max_sequence_length - len(wordlist)):
-                    wordlist.append(numwords)
-            sequences.append(wordlist)
-        return {"targets": targets, "sequences": sequences}
+            for j in range(max_sequence_length):
+                if j < len(wordlist):
+                    datalist[count][j] = wordlist[j]
+                else:
+                    datalist[count][j] = numwords + 1
+                    
+            datalist[count][max_sequence_length] = r[0]
+            datalist[count][max_sequence_length + 1] = r[2]
+        return datalist
         
