@@ -65,6 +65,36 @@ class DataSet:
             name = s[namestart:endstart]
             return {"id": cid, "name": name, "start": tagstart, "end": endstart + 10}
         return -1
+
+    def sanitizeVocab(self):
+        c = self.conn.cursor()
+        wdict = set()
+        c.execute("SELECT `seqvec` FROM data")
+        result = c.fetchall()
+        for r in result:
+            wdict.add(int(r[0]))
+        c.execute("SELECT `wid` FROM `vocab`")
+        result = c.fetchall()
+        for r in result:
+            if int(r[0]) not in wdict:
+                t = (int(r[0]),)
+                c.execute("DELETE FROM `vocab` WHERE `wid` = ?", t)
+        self.conn.commit()        
+        
+    def removeCompanies(self, lower, higher):
+        c = self.conn.cursor()
+        c.execute("SELECT `cid` FROM `companies`")
+        result = c.fetchall()
+        for r in result:
+            t = (r[0],)
+            c.execute("SELECT count(`id`) FROM `data` WHERE `basecid` = ?")
+            countres = c.fetchone()
+            if int(countres[0]) > higher or int(countres[0]) < lower:
+                c.execute("DELETE FROM `companies` WHERE `cid` = ?", t)
+                t = (r[0], r[0])
+                c.execute("DELETE FROM ` data` WHERE `basecid` = ? OR `targetid` = ?", t)
+            self.conn.commit()
+        self.sanitizeVocab()
     
     def fillTables(self):
         print("Building data tables...")
@@ -120,6 +150,8 @@ class DataSet:
                                     targetline = "".join([ch for ch in targetline if ch not in string.punctuation and ch not in string.digits])
                                     targetline = targetline.lower()
                                     tokens = nltk.word_tokenize(targetline, "german")
+                                    stemmer = nltk.stem.snowball.GermanStemmer()
+                                    tokens = [stemmer.stem(w) for w in tokens]
                                     #tokens = [w for w in tokens if w not in stop]
                                     for w in tokens:
                                         if w not in wdict:
@@ -130,7 +162,7 @@ class DataSet:
                                             if wnum % 10000 == 0:
                                                 print("Found " + str(wnum) + " words, continuing...\n")                
                                     seqvec = list(map(lambda x: wdict[x], tokens))
-                                    t = (companies[i]["id"], companies[j]["id"], pickle.dumps(seqvec), len(seqvec),)
+                                    t = (companies[i]["id"], companies[j]["id"], pickle.dumps(seqvec, 0), len(seqvec),)
                                     c.execute("INSERT INTO `data` (`basecid`, `targetcid`, `seqvec`, `len`) VALUES (?, ?, ?, ?)", t)
             self.conn.commit()
             datafile.close()
