@@ -22,6 +22,7 @@ class DataSet:
             os.mkdir(databasefolder)
         if not os.path.isdir(databasefolder):
             os.mkdir(databasefolder)
+        self.first_company_index = -1
         self.conn = sqlite3.connect(databasefolder + "data.db")
         self.initializeTables()
         if not self.checkTable("companies") or not self.checkTable("vocab") or not self.checkTable("data"):
@@ -37,11 +38,21 @@ class DataSet:
         t = (name,)
         c.execute("SELECT * FROM `sqlite_master` WHERE `type`='table' AND `name`=?", t)
         if c.fetchone() is None:
+            print("No table " + name + " found, initializing data.\n")
             return False
         else:
             c.execute("SELECT * FROM " + name)
             if c.fetchone() is None:
+                print("No content in table " + name + " found, initializing data.\n")
                 return False
+        c.execute("SELECT `name` FROM `companies` WHERE `num`=0")
+        result = c.fetchone()
+        t = (result[0],)
+        c.execute("SELECT `wid` FROM `vocab` WHERE `word` = ?", t)
+        result = c.fetchone()
+        self.first_company_index = -1
+        if result is not None:
+            self.first_company_index = int(result[0]) 
         return True
     
     def initializeTables(self):
@@ -68,37 +79,92 @@ class DataSet:
 
     def sanitizeVocab(self):
         c = self.conn.cursor()
-        wdict = set()
+        wdict = dict()
+        wnum = 0
+        counter = 0
+        print("Step 1: Creating temporary index mapping...\n")
         c.execute("SELECT `seqvec` FROM data")
         result = c.fetchall()
         for r in result:
-            wdict.add(int(r[0]))
-        c.execute("SELECT `wid` FROM `vocab`")
+            seqvec = pickle.loads(r[0])
+            for w in seqvec:
+                if w not in wdict:
+                    wdict[w] = wnum
+                    wnum += 1
+            counter += 1
+            if (counter % 10000) == 0:
+                print("Checked " + str(counter) + " data lines.\n")
+        print("Created temporary dictionary with " + str(len(wdict)) + " words.\n")
+        print("Step 2: Cleaning vocab table...\n")
+        c.execute("SELECT `wid`, `word` FROM `vocab`")
         result = c.fetchall()
+        counter = 0
+        c.execute("DELETE FROM `vocab`")
         for r in result:
-            if int(r[0]) not in wdict:
-                t = (int(r[0]),)
-                c.execute("DELETE FROM `vocab` WHERE `wid` = ?", t)
-        self.conn.commit()        
+            t = (wdict[int(r[0])], r[1], )
+            c.execute("INSERT INTO `vocab` VALUES (?, ?)", t)
+            counter += 1
+            if (counter % 10000) == 0:
+                print("Inserted " + str(counter) + " words.\n")
+        print("Committing...\n")
+        self.conn.commit()
+        print("New vocab table completed.\n")
+        print("Step 3: Refreshing sequence vectors...\n")
+        c.execute("SELECT `id`. `seqvec` FROM `data`")
+        result = c.fetchall()
+        counter = 0
+        for r in result:
+            seqvec = pickle.loads(r[1])
+            seqvec = list(map(lambda x: wdict[x], seqvec))
+            seqvec = pickle.dumps(seqvec, 0)
+            t = (seqvec, r[0], )
+            c.execute("UPDATE `data` SET `seqvec` = ? WHERE `id` = ?", t)
+            counter += 1
+            if (counter % 10000) == 0:
+                print("Refreshed " + str(counter) + " data lines.\n")
+        print("Committing...\n")
+        self.conn.commit()
+        print("Dataset refreshed.\n")
         
     def removeCompanies(self, lower, higher):
         c = self.conn.cursor()
-        c.execute("SELECT `cid` FROM `companies`")
+        t = (lower, higher,)
+        c.execute("SELECT `basecid`, c FROM (SELECT `basecid`, COUNT(`id`) AS c FROM `data` GROUP BY `basecid`) WHERE c < ? OR c > ?", t)
         result = c.fetchall()
+        print("Found " + str(len(result)) + " companies to delete.\n")
         for r in result:
             t = (r[0],)
-            c.execute("SELECT count(`id`) FROM `data` WHERE `basecid` = ?")
-            countres = c.fetchone()
-            if int(countres[0]) > higher or int(countres[0]) < lower:
-                c.execute("DELETE FROM `companies` WHERE `cid` = ?", t)
-                t = (r[0], r[0])
-                c.execute("DELETE FROM ` data` WHERE `basecid` = ? OR `targetid` = ?", t)
-            self.conn.commit()
-        self.sanitizeVocab()
+            c.execute("DELETE FROM `companies` WHERE `cid` = ?", t)
+            t = (r[0], r[0])
+            c.execute("DELETE FROM `data` WHERE `basecid` = ? OR `targetcid` = ?", t)
+        self.conn.commit()
+        c.execute("SELECT * FROM `companies` ORDER BY `num` ASC")
+        result = c.fetchall()
+        c.execute("DELETE FROM `companies`")
+        c.execute("VACUUM")
+        for i in range(len(result)):
+            t = (result[i][0], str(i), result[i][2],)
+            c. execute("INSERT INTO `companies` VALUES (?, ?, ?)", t)
+        self.conn.commit()
+    
+    def addCompaniesToVocab(self):
+        c = self.conn.cursor()
+        c.execute("SELECT max(`wid`) FROM `vocab`")
+        result = c.fetchone()
+        wnum = int(result[0]) + 1
+        c.execute("SELECT `name` FROM `companies`")
+        result = c.fetchall()
+        self.first_company_index = wnum
+        for r in result:
+            t = (wnum, r[0],)
+            c.execute("INSERT INTO `vocab` VALUES (?, ?)", t)
+            wnum += 1
+        self.conn.commit()
+            
     
     def fillTables(self):
         print("Building data tables...")
-        wnum = 2
+        wnum = 3
         cnum = 0
         snum = 0
         lnum = 0
@@ -108,8 +174,10 @@ class DataSet:
         c = self.conn.cursor()
         c.execute("INSERT INTO `vocab` VALUES (0, 'basecompanyplaceholder')")
         c.execute("INSERT INTO `vocab` VALUES (1, 'targetcompanyplaceholder')")
+        c.execute("INSERT INTO `vocab` VALUES (2, '<PAD>')")
         wdict["basecompanyplaceholder"] = 0
         wdict["targetcompanyplaceholder"] = 1
+        wdict["<PAD>"] = 2
         self.conn.commit()
         for f in glob.glob(self.datafolder + "*.txt"):
             print("Processing file " + f + "...\n")
@@ -187,29 +255,51 @@ class DataSet:
         c.execute("SELECT count(`wid`) FROM `vocab`")
         result = c.fetchone()
         return int(result[0])
+    
+    def getVocabMapping(self):
+        c = self.conn.cursor()
+        c.execute("SELECT `wid`, `word` FROM `vocab`")
+        result = c.fetchall()
+        mapping = dict()
+        for r in result:
+            mapping[r[1]] = int(r[0])
+        return mapping
         
-    def getDatasetFor(self, basecompany, max_sequence_length):
+    def getDatasetFor(self, basecompany, max_sequence_length, companies=False, limit=-1):
         t = (basecompany,)
         c = self.conn.cursor()
-        c.execute("SELECT `name` FROM `companies` WHERE `cid`=?", t)
-        result = c.fetchone()
-        name = result[0]
-        print("Selected basecompany " + name + ", loading data...\n")
-        c.execute("SELECT c.`num`, d.`seqvec`, d.`len` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid` WHERE `basecid`=?", t)
+        if not companies:
+            c.execute("SELECT `name` FROM `companies` WHERE `cid`=?", t)
+            result = c.fetchone()
+            name = result[0]
+            print("Selected basecompany " + name + ", loading data...\n")
+            sql = "SELECT c.`num`, d.`seqvec`, d.`len` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid` WHERE `basecid`=?"
+            if limit > 0:
+                sql += " LIMIT " + str(limit)
+            c.execute(sql, t)
+        else:
+            sql = "SELECT c.`num`, d.`seqvec`, d.`len` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid`"
+            if limit > 0:
+                sql += " LIMIT " + str(limit)
+            c.execute(sql)
         result = c.fetchall()
-        print("Found " + str(len(result)) + " sentences including this basecompany.\n")
-        c.execute("SELECT COUNT(`wid`) FROM `vocab`")
-        tempresult = c.fetchone()
-        numwords = int(tempresult[0])
-        datalist = numpy.zeros(shape=(len(result), max_sequence_length + 2), dtype=numpy.int32)
+        print("Found " + str(len(result)) + " sentences.\n")
+        datalen = max_sequence_length + 2
+        if companies:
+            datalen += 1
+        datalist = numpy.zeros(shape=(len(result), datalen), dtype=numpy.int32)
         count = 0
         for r in result:
             wordlist = pickle.loads(r[1])
-            for j in range(max_sequence_length):
+            start = 0
+            if companies:
+                start = 1
+                datalist[count][0] = self.first_company_index + r[0]
+            for j in range(start, max_sequence_length):
                 if j < len(wordlist):
                     datalist[count][j] = wordlist[j]
                 else:
-                    datalist[count][j] = numwords + 1
+                    datalist[count][j] = 2
                     
             datalist[count][max_sequence_length] = r[0]
             datalist[count][max_sequence_length + 1] = r[2]

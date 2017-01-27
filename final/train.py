@@ -35,7 +35,7 @@ def main():
 #	util.dataprocessor.run(hyper_params["max_seq_length"],
 #		hyper_params["max_vocab_size"])
 	
-	dataset = DataSet("/home/t2/data/", "/home/t2/")
+	dataset = DataSet("/home/jonas/kit/mlgpu/data/", "/home/jonas/kit/mlgpu/")
 
 	#create model
 	print "Creating model with..."
@@ -48,7 +48,7 @@ def main():
 #	infile = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
 	#randomize data order
 #	print infile
-	data = dataset.getDatasetFor(90053, 25)
+	data = dataset.getDatasetFor(90053, 25, limit=25000)
 	np.random.shuffle(data)
 	#data = data[:3000]
 	num_batches = len(data) / hyper_params["batch_size"]

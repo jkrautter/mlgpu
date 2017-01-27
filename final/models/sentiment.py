@@ -19,7 +19,7 @@ class SentimentModel(object):
 	def __init__(self, vocab_size, hidden_size, dropout,
 	num_layers, max_gradient_norm, max_seq_length,
 	learning_rate, lr_decay,batch_size, forward_only=False):
-		self.num_classes = 250157
+		self.num_classes = 16363 
 		self.vocab_size = vocab_size
 		self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
 		self.learning_rate_decay_op = self.learning_rate.assign(
@@ -156,7 +156,8 @@ class SentimentModel(object):
 		self.test_batch_pointer = 0
 		#cutoff non even number of batches
 		targets = (data.transpose()[-2]).transpose()
-		onehot = np.zeros((len(targets), 2))
+                print("Onehot size: " + str(len(targets)) + " x " + str(self.num_classes))
+		onehot = np.zeros((len(targets), self.num_classes))
 		onehot[np.arange(len(targets)), targets] = 1
 		sequence_lengths = (data.transpose()[-1]).transpose()
 		data = (data.transpose()[0:-2]).transpose()
