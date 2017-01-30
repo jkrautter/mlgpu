@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 I used mainly the tensorflow translation example:
 https://github.com/tensorflow/tensorflow/
@@ -23,7 +24,15 @@ import string
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 flags.DEFINE_string('checkpoint_dir', 'data/checkpoints/', 'Directory to store/restore checkpoints')
-flags.DEFINE_string('text', 'Hello World!', 'Text to sample with.')
+#flags.DEFINE_string('text', 'Der US-Technologieriese basecompanyplaceholder will stärker mit Unternehmen ins Geschäft kommen und schmiedet deshalb eine Partnerschaft'
+#					' mit dem deutschen Softwarekonzern targetcompanyplaceholder .', 'Text to sample with.')
+#flags.DEFINE_string('text', 'Um stärker mit Unternehmen ins Geschäft zu kommen , setzt basecompanyplaceholder künftig auf eine Kooperation '
+#					'mit dem deutschen Softwarekonzern targetcompanyplaceholder .', 'Text to sample with.')
+#flags.DEFINE_string('text', 'Der Grund : Immer mehr Nutzer holen siche die Musik nicht mehr von CDs , sondern von Streaming-Diensten wie targetcompanyplaceholder'
+#				' , basecompanyplaceholder Music oder Napster . .', 'Text to sample with.')
+flags.DEFINE_string('text', 'PhotoFast iType-C Flash Drive mit App ONE PhotoFast bleibt seiner Philosophie den Gebrauch von basecompanyplaceholder' 
+				' iPhone und iPad durch innovative Produkte zu verbessern treu und demonstriert zusammen mit dem Vertriebspartner targetcompanyplaceholder' 
+				' den neuen iType-C Flash Drive . ', 'Text to sample with.')
 flags.DEFINE_string('config_file', 'config.ini', 'Path to configuration file.')
 
 def main():
@@ -60,15 +69,16 @@ def prepareText(text, max_seq_length, vocab_mapping):
 	seq_lengths = []
 	text = "".join([ch for ch in text if ch not in string.punctuation and ch not in string.digits])
 	tokens = nltk.word_tokenize(text.lower(), "german")
+	tokens = [w.decode("utf-8") for w in tokens]
 	stemmer = nltk.stem.snowball.GermanStemmer()
-	tokens = [stemmer.stem(w) for w in tokens]
+	#tokens = [stemmer.stem(w) for w in tokens]
 	if len(tokens) > max_seq_length:
 		tokens = tokens[0:max_seq_length]
 	inputs = []
 
 	indices = [vocab_mapping[j] for j in tokens]
 	if len(indices) < max_seq_length:
-		indices = indices + [(len(vocab_mapping) + 1) for i in range(max_seq_length - len(indices))]
+		indices = indices + [2 for i in range(max_seq_length - len(indices))]
 	else:
 		indices = indices[0:max_seq_length]
 	seq_lengths.append(len(tokens))
@@ -76,7 +86,7 @@ def prepareText(text, max_seq_length, vocab_mapping):
 	data = np.vstack((data, indices))
 	targets.append(1)
 
-	onehot = np.zeros((len(targets), 16363))
+	onehot = np.zeros((len(targets), 16356))
 	onehot[np.arange(len(targets)), targets] = 1
 	return data[1::], np.array(seq_lengths), onehot
 

@@ -79,8 +79,8 @@ class DataSet:
 
     def sanitizeVocab(self):
         c = self.conn.cursor()
-        wdict = dict()
-        wnum = 0
+        wdict = {0: 0, 1: 1, 2: 2}
+        wnum = 3
         counter = 0
         print("Step 1: Creating temporary index mapping...\n")
         c.execute("SELECT `seqvec` FROM data")
@@ -88,8 +88,8 @@ class DataSet:
         for r in result:
             seqvec = pickle.loads(r[0])
             for w in seqvec:
-                if w not in wdict:
-                    wdict[w] = wnum
+                if w not in wdict and w > 2:
+                    wdict[int(w)] = wnum
                     wnum += 1
             counter += 1
             if (counter % 10000) == 0:
@@ -101,16 +101,17 @@ class DataSet:
         counter = 0
         c.execute("DELETE FROM `vocab`")
         for r in result:
-            t = (wdict[int(r[0])], r[1], )
-            c.execute("INSERT INTO `vocab` VALUES (?, ?)", t)
-            counter += 1
-            if (counter % 10000) == 0:
-                print("Inserted " + str(counter) + " words.\n")
+            if int(r[0]) in wdict: 
+                t = (str(wdict[int(r[0])]), r[1], )
+                c.execute("INSERT INTO `vocab` VALUES (?, ?)", t)
+                counter += 1
+                if (counter % 10000) == 0:
+                    print("Inserted " + str(counter) + " words.\n")
         print("Committing...\n")
         self.conn.commit()
         print("New vocab table completed.\n")
         print("Step 3: Refreshing sequence vectors...\n")
-        c.execute("SELECT `id`. `seqvec` FROM `data`")
+        c.execute("SELECT `id`, `seqvec` FROM `data`")
         result = c.fetchall()
         counter = 0
         for r in result:
@@ -138,6 +139,10 @@ class DataSet:
             t = (r[0], r[0])
             c.execute("DELETE FROM `data` WHERE `basecid` = ? OR `targetcid` = ?", t)
         self.conn.commit()
+        self.sanitizeCompanyNums()
+    
+    def sanitizeCompanyNums(self):
+        c = self.conn.cursor()
         c.execute("SELECT * FROM `companies` ORDER BY `num` ASC")
         result = c.fetchall()
         c.execute("DELETE FROM `companies`")
@@ -219,7 +224,7 @@ class DataSet:
                                     targetline = targetline.lower()
                                     tokens = nltk.word_tokenize(targetline, "german")
                                     stemmer = nltk.stem.snowball.GermanStemmer()
-                                    tokens = [stemmer.stem(w) for w in tokens]
+                                    #tokens = [stemmer.stem(w) for w in tokens]
                                     #tokens = [w for w in tokens if w not in stop]
                                     for w in tokens:
                                         if w not in wdict:
@@ -300,8 +305,8 @@ class DataSet:
                     datalist[count][j] = wordlist[j]
                 else:
                     datalist[count][j] = 2
-                    
-            datalist[count][max_sequence_length] = r[0]
-            datalist[count][max_sequence_length + 1] = r[2]
+            datalist[count][max_sequence_length] = int(r[0])
+            datalist[count][max_sequence_length + 1] = int(r[2])
+            count += 1
         return datalist
         
