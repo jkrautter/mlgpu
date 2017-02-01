@@ -1,4 +1,3 @@
-
 import tensorflow as tf
 from tensorflow.python.ops import rnn, rnn_cell, seq2seq
 import numpy as np
@@ -77,6 +76,7 @@ class SentimentModel(object):
 			for state in rnn_state[-1]:
 				states_list.append(state)
 			avg_states = tf.reduce_mean(tf.pack(states_list), 0)
+			self.representation = rnn_state[-1][0]
 
 		with tf.variable_scope("output_projection"):
 			W = tf.get_variable(
