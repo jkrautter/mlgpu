@@ -39,7 +39,7 @@ def main():
         outputs = sess.run(output_feed, input_feed)
         count = 0
         for o in outputs:
-            t = (str(dataset["ids"][count]), pickle.dumps(o.tolist(), 0))
+            t = (str(dataset["ids"][count]), pickle.dumps(o, 0))
             c.execute("INSERT INTO `vectors` (?, ?)")
         conn.commit()
 
