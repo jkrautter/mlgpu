@@ -33,6 +33,7 @@ class SentimentModel(object):
 		self.max_gradient_norm = max_gradient_norm
 		self.global_step = tf.Variable(0, trainable=False)
 		self.max_seq_length = max_seq_length
+		self.representation = []
 
 		#seq_input: list of tensors, each tensor is size max_seq_length
 		#target: a list of values betweeen 0 and 1 indicating target scores
@@ -76,7 +77,7 @@ class SentimentModel(object):
 			for state in rnn_state[-1]:
 				states_list.append(state)
 			avg_states = tf.reduce_mean(tf.pack(states_list), 0)
-			self.representation = rnn_state[-1][0]
+			self.representation.append(rnn_state[-1][0])
 
 		with tf.variable_scope("output_projection"):
 			W = tf.get_variable(

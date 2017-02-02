@@ -19,12 +19,12 @@ flags.DEFINE_string('config_file', 'config.ini', 'Path to configuration file.')
 flags.DEFINE_string('checkpoint_dir', 'data/checkpoints/', 'Directory to store/restore checkpoints')
 
 def main():
-    s = DataSet("/home/jonas/kit/mlgpu/data/", "/home/jonas/kit/mlgpu/")
+    s = DataSet("/home/t2/data/", "/home/t2/")
     vocab_mapping = s.getVocabMapping()
     dataset = s.getDatasetFor(80354, 30, targets=False, dataids=True, limit=25000)
-    seqlengths = np.full((len(dataset["data"]), ), 30)
-    targets = np.zeros((len(dataset["data"]), 16356))
-    conn = sqlite3.connect("/home/jonas/kit/mlgpu/repr_80354.db")
+    seqlengths = np.full(len(dataset["data"]), 30, dtype=np.int32)
+    targets = np.zeros((len(dataset["data"]), 16356), dtype=np.int32)
+    conn = sqlite3.connect("/home/t2/repr_80354.db")
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS `vectors` (`did` INTEGER NOT NULL PRIMARY KEY, `repr` BLOB)")
     with tf.Session() as sess:
