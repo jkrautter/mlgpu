@@ -53,7 +53,8 @@ def load_model(session, vocab_size):
         hyper_params["max_seq_length"],
         hyper_params["learning_rate"],
         hyper_params["lr_decay_factor"],
-        1)
+        25000,
+        forward_only=True)
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
     if ckpt and gfile.Exists(ckpt.model_checkpoint_path):
         print "Reading model parameters from {0}".format(ckpt.model_checkpoint_path)
