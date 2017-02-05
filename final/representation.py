@@ -17,16 +17,21 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS
 flags.DEFINE_string('config_file', 'config.ini', 'Path to configuration file.')
 flags.DEFINE_string('checkpoint_dir', 'data/checkpoints/', 'Directory to store/restore checkpoints')
+flags.DEFINE_integer('company_id', 80354, 'Company of the basecompany to use')
+flags.DEFINE_boolean('binary_output', None, 'File to output binary')
 
 def main():
     s = DataSet("/home/t2/data/", "/home/t2/")
     vocab_mapping = s.getVocabMapping()
-    dataset = s.getDatasetFor(80354, 30, targets=False, dataids=True, limit=25000)
+    dataset = s.getDatasetFor(FLAGS.company_id, 30, targets=False, dataids=True, limit=25000)
     seqlengths = np.full(len(dataset["data"]), 30, dtype=np.int32)
     targets = np.zeros((len(dataset["data"]), 16356), dtype=np.int32)
-    conn = sqlite3.connect("/home/t2/repr_80354.db")
+    conn = sqlite3.connect("/home/t2/repr_" + str(FLAGS.company_id) + ".db")
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS `vectors` (`did` INTEGER NOT NULL PRIMARY KEY, `repr` BLOB)")
+    ofile = None
+    if FLAGS.binary_output is not None:
+        ofile = open(FLAGS.binary_output, "wb")
     with tf.Session() as sess:
         model = load_model(sess, len(vocab_mapping))
         if model == None:
@@ -41,6 +46,11 @@ def main():
         for o in outputs:
             t = (str(dataset["ids"][count]), pickle.dumps(o, 0))
             c.execute("INSERT INTO `vectors` (?, ?)")
+        if ofile is not None:
+            for o in outputs:
+                for i in o:
+                    ofile.write(bytes(i))
+            ofile.close()
         conn.commit()
 
 def load_model(session, vocab_size):
