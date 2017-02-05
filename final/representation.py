@@ -18,7 +18,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('config_file', 'config.ini', 'Path to configuration file.')
 flags.DEFINE_string('checkpoint_dir', 'data/checkpoints/', 'Directory to store/restore checkpoints')
 flags.DEFINE_integer('company_id', 80354, 'Company of the basecompany to use')
-flags.DEFINE_string('binary_output', None, 'File to output binary')
+flags.DEFINE_string('csv_output', None, 'File to output binary')
 
 def main():
     s = DataSet("/home/t2/data/", "/home/t2/")
@@ -30,8 +30,8 @@ def main():
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS `vectors` (`did` INTEGER NOT NULL PRIMARY KEY, `repr` BLOB)")
     ofile = None
-    if FLAGS.binary_output is not None:
-        ofile = open(FLAGS.binary_output, "w")
+    if FLAGS.csv_output is not None:
+        ofile = open(FLAGS.csv_output, "w")
     with tf.Session() as sess:
         model = load_model(sess, len(vocab_mapping))
         if model == None:
@@ -46,7 +46,7 @@ def main():
         for o in outputs[0][0]:
             t = (str(dataset["ids"][count]), str(pickle.dumps(o, 0)))
         if ofile is not None:
-            for o in outputs:
+            for o in outputs[0][0]:
                 ofile.write(bytes(dataset["ids"][count]))
                 ofile.write(";")
                 for i in o:
