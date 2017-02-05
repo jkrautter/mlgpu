@@ -44,13 +44,13 @@ def main():
         outputs = sess.run(output_feed, input_feed)
         count = 0
         for o in outputs:
-            t = (str(dataset["ids"][count]), pickle.dumps(o, 0))
-            c.execute("INSERT INTO `vectors` (?, ?)")
-        if ofile is not None:
-            for o in outputs:
-                for i in o:
-                    ofile.write(bytes(i))
+            t = (str(dataset["ids"][count]), str(pickle.dumps(o, 0)))
+            if ofile is not None:
+                for o in outputs:
+                    for i in o:
+                        ofile.write(bytes(i))
             ofile.close()
+        c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
         conn.commit()
 
 def load_model(session, vocab_size):
