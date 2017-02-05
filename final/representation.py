@@ -45,15 +45,20 @@ def main():
         count = 0
         for o in outputs[0][0]:
             t = (str(dataset["ids"][count]), str(pickle.dumps(o, 0)))
+            c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
+            count += 1
+            
         if ofile is not None:
+            count = 0
             for o in outputs[0][0]:
                 ofile.write(bytes(dataset["ids"][count]))
-                ofile.write(";")
                 for i in o:
-                    ofile.write(str(i))
                     ofile.write(";")
+                    ofile.write(str(i))
+                ofile.write("\n")
+                count += 1
             ofile.close()
-        c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
+   
         conn.commit()
 
 def load_model(session, vocab_size):
