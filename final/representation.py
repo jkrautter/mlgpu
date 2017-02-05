@@ -18,7 +18,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('config_file', 'config.ini', 'Path to configuration file.')
 flags.DEFINE_string('checkpoint_dir', 'data/checkpoints/', 'Directory to store/restore checkpoints')
 flags.DEFINE_integer('company_id', 80354, 'Company of the basecompany to use')
-flags.DEFINE_boolean('binary_output', None, 'File to output binary')
+flags.DEFINE_string('binary_output', None, 'File to output binary')
 
 def main():
     s = DataSet("/home/t2/data/", "/home/t2/")
