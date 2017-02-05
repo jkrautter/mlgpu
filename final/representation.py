@@ -43,14 +43,16 @@ def main():
         output_feed = [model.representation]
         outputs = sess.run(output_feed, input_feed)
         count = 0
-        for o in outputs:
+        for o in outputs[0][0]:
             t = (str(dataset["ids"][count]), str(pickle.dumps(o, 0)))
-            if ofile is not None:
-                for o in outputs:
-                    for i in o:
-                        ofile.write(str(i))
-                        ofile.write(";")
-                ofile.close()
+        if ofile is not None:
+            for o in outputs:
+                ofile.write(bytes(dataset["ids"][count]))
+                ofile.write(";")
+                for i in o:
+                    ofile.write(str(i))
+                    ofile.write(";")
+            ofile.close()
         c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
         conn.commit()
 
