@@ -49,7 +49,7 @@ def main():
                 for o in outputs:
                     for i in o:
                         ofile.write(bytes(i))
-            ofile.close()
+                ofile.close()
         c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
         conn.commit()
 
