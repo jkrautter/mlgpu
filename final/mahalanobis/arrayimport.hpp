@@ -2,6 +2,12 @@
 #include <iostream>
 #include <fstream>
 
+/*
+ * Importiert ein Array von Vektoren, die Beziehungen repräsentieren. 
+ * dest: float-Array der Größe: Anzahl Sätze x Größe Vektoren (25000x50)
+ * ids:  int-Array der Größe: Anzahl Sätze (Enthält danach die entsprechenden IDs der jeweiligen Sätze
+ * filename: Der Dateiname des zu lesenden Arrays (/home/t2/repr_80354.csv für Lufthansa)
+ */
 void arrayimport(float *dest, int *ids, const std::string &filename) {
 	std::ifstream infile(filename);
 	unsigned int current_dest_index = 0;
@@ -27,6 +33,6 @@ void arrayimport(float *dest, int *ids, const std::string &filename) {
 			dest[current_dest_index] = std::stof(tmp);
 			current_dest_index++;
 		}
-		infile.close()
+		infile.close();
 	}
 }
