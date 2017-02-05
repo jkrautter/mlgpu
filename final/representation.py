@@ -31,7 +31,7 @@ def main():
     c.execute("CREATE TABLE IF NOT EXISTS `vectors` (`did` INTEGER NOT NULL PRIMARY KEY, `repr` BLOB)")
     ofile = None
     if FLAGS.binary_output is not None:
-        ofile = open(FLAGS.binary_output, "wb")
+        ofile = open(FLAGS.binary_output, "w")
     with tf.Session() as sess:
         model = load_model(sess, len(vocab_mapping))
         if model == None:
@@ -48,7 +48,8 @@ def main():
             if ofile is not None:
                 for o in outputs:
                     for i in o:
-                        ofile.write(bytes(i))
+                        ofile.write(str(i))
+                        ofile.write(";")
                 ofile.close()
         c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
         conn.commit()
