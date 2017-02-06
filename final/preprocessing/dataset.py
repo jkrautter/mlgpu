@@ -270,7 +270,7 @@ class DataSet:
             mapping[r[1]] = int(r[0])
         return mapping
         
-    def getDatasetFor(self, basecompany, max_sequence_length, companies=False, limit=-1):
+    def getDatasetFor(self, basecompany, max_sequence_length, targets=True, companies=False, limit=-1, dataids=False):
         t = (basecompany,)
         c = self.conn.cursor()
         if not companies:
@@ -278,20 +278,23 @@ class DataSet:
             result = c.fetchone()
             name = result[0]
             print("Selected basecompany " + name + ", loading data...\n")
-            sql = "SELECT c.`num`, d.`seqvec`, d.`len` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid` WHERE `basecid`=?"
+            sql = "SELECT c.`num`, d.`seqvec`, d.`len`, d.`id` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid` WHERE `basecid`=?"
             if limit > 0:
                 sql += " LIMIT " + str(limit)
             c.execute(sql, t)
         else:
-            sql = "SELECT c.`num`, d.`seqvec`, d.`len` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid`"
+            sql = "SELECT c.`num`, d.`seqvec`, d.`len`, d.`id` FROM `data` AS d JOIN `companies` AS c ON d.`targetcid` = c.`cid`"
             if limit > 0:
                 sql += " LIMIT " + str(limit)
             c.execute(sql)
         result = c.fetchall()
         print("Found " + str(len(result)) + " sentences.\n")
-        datalen = max_sequence_length + 2
+        datalen = max_sequence_length
+        if targets:
+            datalen = max_sequence_length + 2
         if companies:
             datalen += 1
+        didlist = []
         datalist = numpy.zeros(shape=(len(result), datalen), dtype=numpy.int32)
         count = 0
         for r in result:
@@ -305,8 +308,14 @@ class DataSet:
                     datalist[count][j] = wordlist[j]
                 else:
                     datalist[count][j] = 2
-            datalist[count][max_sequence_length] = int(r[0])
-            datalist[count][max_sequence_length + 1] = int(r[2])
+            if targets:
+                datalist[count][max_sequence_length] = int(r[0])
+                datalist[count][max_sequence_length + 1] = int(r[2])
+            if dataids:
+                didlist.append(int(r[3]))
             count += 1
-        return datalist
+        if dataids:
+            return {"data": datalist, "ids": didlist}
+        else:
+            return datalist
         
