@@ -39,6 +39,7 @@ float computeRangeBetweenVectors(float* a, float* b, float*  inverse_covariance_
     cublasSafeCall(cublasCreate(&handle));
 
     cublasSafeCall(
+q
 	cublasSgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, 1, n, n,
 			    &alpha,
 		            thrust::raw_pointer_cast(d_a.data()), n,
@@ -108,8 +109,17 @@ struct linear_index_to_row_index : public thrust::unary_function<T,T> {
 	__host__ __device__ T operator()(T i) { return i / Ncols; }
 };
 
+float* computeCovarianceMatrix(float* data, int n, int m)
+{
+    thrust::device_vector<float> d_X(n * m);
+    for(int i = 0; i < n * m; i++) d_X[i] = data[i];
+
+    return d_computeCovarianceMatrix(n, m, d_X);
+}
+
+
 //thrust::device_vector<float> computeCovarianceMatrix(int Nsamples, int NX, thrust::device_vector<float> d_X)
-float* computeCovarianceMatrix(int Nsamples, int NX, thrust::device_vector<float> d_X)
+float* d_computeCovarianceMatrix(int Nsamples, int NX, thrust::device_vector<float> d_X)
 {	
     // --- cuBLAS handle creation
     cublasHandle_t handle;
