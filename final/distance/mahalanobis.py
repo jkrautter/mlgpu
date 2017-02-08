@@ -35,9 +35,9 @@ class Mahalanobis:
             [reikna.core.Parameter("data_mod", reikna.core.Annotation(data_t, "io")),
              reikna.core.Parameter("mean", reikna.core.Annotation(means_t, "i"))],
                         """
-                        VSIZE_T idx = ${idxs[0]}
-                        VSIZE_T idy = ${idxs[1]}
-                        ${data_mod.store_idx}(idx, idy, ${data_mod.load_idx}(idx, idy) + ${mean.load_idx}(idy))
+                        VSIZE_T idx = ${idxs[0]};
+                        VSIZE_T idy = ${idxs[1]};
+                        ${data_mod.store_idx}(idx, idy, ${data_mod.load_idx}(idx, idy) + ${mean.load_idx}(idy));
                         """)
         sub_mean.compile(self.thr)
         sub_mean(self.d_data_mod, self.d_means)
