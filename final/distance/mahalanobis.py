@@ -37,7 +37,7 @@ class Mahalanobis:
                         """
                         VSIZE_T idx = ${idxs[0]}
                         VSIZE_T idy = ${idxs[1]}
-                        ${data_mod.store_idx}(idx, idy, ${data_mod.load_idx}(idx, idy), ${mean.load_idx}(idy))
+                        ${data_mod.store_idx}(idx, idy, ${data_mod.load_idx}(idx, idy) + ${mean.load_idx}(idy))
                         """)
         sub_mean.compile(self.thr)
         sub_mean(self.d_data_mod, self.d_means)
