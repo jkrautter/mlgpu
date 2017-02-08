@@ -24,10 +24,11 @@ class Mahalanobis:
         reducerc = reducer.compile(self.thr)
         reducerc(self.d_data, self.d_means)
         self.means = self.d_means.get()
-        for i in self.means:
-            self.means /= self.n
+        for i in range(len(self.means)):
+            self.means[i] /= self.n
+            print(str(self.means[i]))        
         self.thr.to_device(self.means, dest=self.d_means)
-        self.d_data_mod = self.thr.copy_array(self.data)
+        self.d_data_mod = self.thr.copy_array(self.d_data)
         data_t = reikna.core.Type(np.float32, shape=self.data.shape)
         means_t = reikna.core.Type(np.float32, shape=self.d_means.shape)
         sub_mean = reikna.algorithms.PureParallel(
