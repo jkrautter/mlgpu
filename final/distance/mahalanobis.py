@@ -20,11 +20,11 @@ class Mahalanobis:
         
     def computeInvCovMatrix(self):
         self.d_means = self.thr.array((self.data.shape[1]), dtype=np.float32)
-        predicate = reikna.algorithms.Predicate("""
+        predicate = reikna.algorithms.Predicate(reikna.cluda.Snippet("""
             <%def name="add(a, b)">
                 ${a} + ${b} / ${n}
             </%def>
-        """, render_kwds=dict(n=self.n))
+        """, render_kwds=dict(n=self.n)))
         reducer = reikna.algorithms.Reduce(self.d_data, predicate, axis=[1])
         reducerc = reducer.compile(self.thr)
         reducerc(self.d_data, self.d_means)
