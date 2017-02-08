@@ -174,6 +174,7 @@ class DataSet:
         snum = 0
         lnum = 0
         wdict = dict()
+        sdict = dict()
         cset = set()
         stop = nltk.corpus.stopwords.words("german")
         c = self.conn.cursor()
@@ -199,6 +200,7 @@ class DataSet:
                         if nextcomp["id"] not in cset and "\n" not in nextcomp["name"]:
                             t = (nextcomp["id"], cnum, nextcomp["name"])
                             cset.add(nextcomp["id"])
+                            sdict[nextcomp["id"]] = set()
                             c.execute("INSERT INTO `companies` VALUES (?, ?, ?)", t)
                             cnum += 1
                             if cnum % 10000 == 0:
@@ -235,8 +237,11 @@ class DataSet:
                                             if wnum % 10000 == 0:
                                                 print("Found " + str(wnum) + " words, continuing...\n")                
                                     seqvec = list(map(lambda x: wdict[x], tokens))
-                                    t = (companies[i]["id"], companies[j]["id"], pickle.dumps(seqvec, 0), len(seqvec),)
-                                    c.execute("INSERT INTO `data` (`basecid`, `targetcid`, `seqvec`, `len`) VALUES (?, ?, ?, ?)", t)
+                                    blob = pickle.dumps(seqvec, 0)
+                                    if blob not in sdict[companies[i]["id"]]:
+                                        sdict[companies[i]["id"]].add(blob)
+                                        t = (companies[i]["id"], companies[j]["id"], blob, len(seqvec),)
+                                        c.execute("INSERT INTO `data` (`basecid`, `targetcid`, `seqvec`, `len`) VALUES (?, ?, ?, ?)", t)
             self.conn.commit()
             datafile.close()
         print("All files processed, " + str(wnum) + " words, " + str(cnum) + " companies and " + str(snum) + " sentences found.")
