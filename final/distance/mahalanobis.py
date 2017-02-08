@@ -77,15 +77,19 @@ class Mahalanobis:
         nearest = [0]
         dists = [self.computeDistance(x, self.data[0])]
         for i in range(1, self.data.shape[0]):
+            if (i % 1000) == 0:
+                print("Compared " + str(i) + " vectors...\n")
             dist = self.computeDistance(x, self.data[i])
             if dist < dists[maxd] or len(nearest) < k:
                 if len(nearest) < k:
                     nearest.append(i)
                     dists.append(dist)
+                    if dist > dists[maxd]:
+                        maxd = len(nearest) - 1
                 else:
                     nearest[maxd] = i
                     dists[maxd] = dist
                     for j in range(len(nearest)):
-                        if dists[j] < dists[maxd]:
+                        if dists[j] > dists[maxd]:
                             maxd = j
-
+        return {"nearest": nearest, "dists": dists}

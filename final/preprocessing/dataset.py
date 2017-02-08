@@ -15,7 +15,7 @@ import numpy
 
 class DataSet:
     
-    def __init__(self, datafolder="/home/t2/data", datafolderdatabasefolder="/home/t2", max_companies=2):
+    def __init__(self, datafolder="/home/t2/data", databasefolder="/home/t2", max_companies=2):
         self.datafolder = datafolder
         self.max_companies = max_companies
         if not os.path.isdir(databasefolder):

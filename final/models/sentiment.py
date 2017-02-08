@@ -157,7 +157,6 @@ class SentimentModel(object):
 		self.test_batch_pointer = 0
 		#cutoff non even number of batches
 		targets = (data.transpose()[-2]).transpose()
-                print("Onehot size: " + str(len(targets)) + " x " + str(self.num_classes))
 		onehot = np.zeros((len(targets), self.num_classes))
 		onehot[np.arange(len(targets)), targets] = 1
 		sequence_lengths = (data.transpose()[-1]).transpose()
@@ -180,7 +179,7 @@ class SentimentModel(object):
 		self.train_targets = np.split(self.train_targets, num_train_batches)
 		self.train_data = np.split(self.train_data, num_train_batches)
 
-		print "Test size is: {0}, splitting into {1} batches".format(len(self.test_data), num_test_batches)
+		print("Test size is: {0}, splitting into {1} batches".format(len(self.test_data), num_test_batches))
 		self.test_data = np.split(self.test_data, num_test_batches)
 		self.test_targets = onehot[test_start_end_index[0]:test_start_end_index[1]][:test_cutoff]
 		self.test_targets = np.split(self.test_targets, num_test_batches)

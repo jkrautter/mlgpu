@@ -11,7 +11,7 @@ import models.sentiment
 import numpy as np
 import sqlite3
 import pickle
-import ConfigParser
+from configparser import ConfigParser
 
 
 class Representation:
@@ -21,6 +21,8 @@ class Representation:
         self.conn = sqlite3.connect(databasefolder + "/repr_" + str(cid) + ".db")
         self.initializeTables()
         self.limit = limit
+        self.seqlength = seqlength
+        self.cid = cid
         if not self.checkTable("vectors"):
             self.evaluateModel()
     
@@ -39,14 +41,6 @@ class Representation:
             if c.fetchone() is None:
                 print("No content in table " + name + " found, initializing data.\n")
                 return False
-        c.execute("SELECT `name` FROM `companies` WHERE `num`=0")
-        result = c.fetchone()
-        t = (result[0],)
-        c.execute("SELECT `wid` FROM `vocab` WHERE `word` = ?", t)
-        result = c.fetchone()
-        self.first_company_index = -1
-        if result is not None:
-            self.first_company_index = int(result[0]) 
         return True
     
     def initializeTables(self):
@@ -57,12 +51,16 @@ class Representation:
         c = self.conn.cursor()
         c.execute("SELECT * FROM `vectors`")
         result = c.fetchall()
+        
         n = len(pickle.loads(result[0][1]))
-        data = np.array((len(result), n), dtype=np.float32)
+        data = np.empty((len(result), n), dtype=np.float32)
         ids = []
+        count = 0
         for r in result:
             ids.append(int(r[0]))
-            data.append(np.array(pickle.loads(r[1]), dtype=np.float32))
+            tmp = pickle.loads(r[1])
+            np.copyto(data[count], tmp)
+            count += 1
         return {"data": data, "ids": ids}
         
     def evaluateModel(self):
@@ -83,10 +81,9 @@ class Representation:
             outputs = sess.run(output_feed, input_feed)
             count = 0
             for o in outputs[0][0]:
-                t = (str(sequences["ids"][count]), str(pickle.dumps(o, 0)))
-            c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
-            count += 1
-            
+                t = (sequences["ids"][count], pickle.dumps(o, 0))
+                c.execute("INSERT INTO `vectors` VALUES (?, ?)", t)
+                count += 1
         self.conn.commit()
         
     def load_model(self, session, vocab_size):
@@ -115,7 +112,7 @@ class Representation:
         '''
         Reads in config file, returns dictionary of network params
         '''
-        config = ConfigParser.ConfigParser()
+        config = ConfigParser()
         config.read("config.ini")
         dic = {}
         sentiment_section = "sentiment_network_params"
