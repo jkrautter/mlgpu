@@ -28,7 +28,7 @@ def main():
     targets = np.zeros((len(dataset["data"]), 16356), dtype=np.int32)
     conn = sqlite3.connect("/home/t2/repr_" + str(FLAGS.company_id) + ".db")
     c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS `vectors` (`did` INTEGER NOT NULL PRIMARY KEY, `repr` BLOB)")
+    c.execute("CREATE TABLE IF NOT EXISTS `vectors` (`did` INTEGER NOT NULL PRIMARY KEY, `eval` BLOB)")
     ofile = None
     if FLAGS.csv_output is not None:
         ofile = open(FLAGS.csv_output, "w")

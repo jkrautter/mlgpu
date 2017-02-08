@@ -12,10 +12,11 @@ import reikna.linalg
 import math
 
 class Mahalanobis:
-    def __init__(self, data):
+    def __init__(self, data, ids):
         self.api = reikna.cluda.cuda_api()
         self.thr = self.api.Thread.create()
         self.data = data
+        self.ids = ids
         self.d_data = self.thr.to_device(data)
         self.num = data.shape[0]
         self.n = data.shape[1]
@@ -70,4 +71,21 @@ class Mahalanobis:
         res = d_res.get()
         
         return math.sqrt(res[0][0])
+    
+    def getKNearest(self, x, k):
+        maxd = 0
+        nearest = [0]
+        dists = [self.computeDistance(x, self.data[0])]
+        for i in range(1, self.data.shape[0]):
+            dist = self.computeDistance(x, self.data[i])
+            if dist < dists[maxd] or len(nearest) < k:
+                if len(nearest) < k:
+                    nearest.append(i)
+                    dists.append(dist)
+                else:
+                    nearest[maxd] = i
+                    dists[maxd] = dist
+                    for j in range(len(nearest)):
+                        if dists[j] < dists[maxd]:
+                            maxd = j
 

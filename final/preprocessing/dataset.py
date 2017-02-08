@@ -15,7 +15,7 @@ import numpy
 
 class DataSet:
     
-    def __init__(self, datafolder="../../data/", databasefolder="../../", max_companies=2):
+    def __init__(self, datafolder="/home/t2/data", datafolderdatabasefolder="/home/t2", max_companies=2):
         self.datafolder = datafolder
         self.max_companies = max_companies
         if not os.path.isdir(databasefolder):
@@ -23,7 +23,7 @@ class DataSet:
         if not os.path.isdir(databasefolder):
             os.mkdir(databasefolder)
         self.first_company_index = -1
-        self.conn = sqlite3.connect(databasefolder + "data.db")
+        self.conn = sqlite3.connect(databasefolder + "/data.db")
         self.initializeTables()
         if not self.checkTable("companies") or not self.checkTable("vocab") or not self.checkTable("data"):
             self.fillTables()
