@@ -9,6 +9,7 @@ import reikna.cluda
 import reikna.core
 import reikna.algorithms
 import reikna.linalg
+import math
 
 class Mahalanobis:
     def __init__(self, data):
@@ -47,19 +48,26 @@ class Mahalanobis:
         mul = reikna.linalg.MatrixMul(d_data_mod, d_data_mod, out_arr=d_S, transposed_a=True)
         mulc = mul.compile(self.thr)
         mulc(d_S, d_data_mod, d_data_mod)
-        S = d_S.get()
-        for i in range(S.shape[0]):
-            for j in range(S.shape[1]):
-                S[i][j] = S[i][j] / (self.n - 1)
-        S_inv = np.linalg.inv(S)
-        self.d_S_inv = self.thr.to_device(S_inv)
+        self.S = d_S.get()
+        for i in range(self.S.shape[0]):
+            for j in range(self.S.shape[1]):
+                self.S[i][j] = self.S[i][j] / (self.num - 1)
+        self.S_inv = np.linalg.inv(self.S)
+        self.d_S_inv = self.thr.to_device(self.S_inv)
     
     def computeDistance(self, x, y):
-        mul = reikna.linalg.MatrixMul(self.d_S_inv, y, transposed_b=True)
+        diff = np.array([np.subtract(x, y)])
+        d_diff = self.thr.to_device(diff)
+        d_temp = self.thr.array((y.shape[0], 1), dtype=np.float32)
+        mul = reikna.linalg.MatrixMul(self.d_S_inv, d_diff, out_arr=d_temp, transposed_b=True)
         mulc = mul.compile(self.thr)
-        d_temp = mulc(self.d_S_inv, y)
-        mul = reikna.linalg.MatrixMul(x, d_temp)
+        mulc(d_temp, self.d_S_inv, d_diff)
+        
+        d_res = self.thr.array((1, 1), dtype=np.float32)
+        mul = reikna.linalg.MatrixMul(d_diff, d_temp, out_arr=d_res)
         mulc = mul.compile(self.thr)
-        d_res = mulc(x, d_temp)
+        mulc(d_res, d_diff, d_temp)
         res = d_res.get()
-        print(str(res))
+        
+        return math.sqrt(res[0][0])
+
