@@ -210,10 +210,6 @@ class DataSet:
                         tempcnum += 1
                         nextcomp = self.findNextCompany(line, nextcomp["start"] + 6 + math.ceil(math.log10(tempcnum)))
                     if len(companies) <= self.max_companies:
-                        snum += 1
-                        if snum % 10000 == 0:
-                            print("Lines processed for database: " + str(snum) + "\n")
-                            self.conn.commit()
                         for i in range(len(companies)):
                             baseline = line.replace("[<[" + str(i) + "]>]", " basecompanyplaceholder ")
                             for j in range(len(companies)):
@@ -239,6 +235,10 @@ class DataSet:
                                     seqvec = list(map(lambda x: wdict[x], tokens))
                                     blob = pickle.dumps(seqvec, 0)
                                     if blob not in sdict[companies[i]["id"]]:
+                                        snum += 1
+                                        if snum % 10000 == 0:
+                                            print("Lines processed for database: " + str(snum) + "\n")
+                                            self.conn.commit()
                                         sdict[companies[i]["id"]].add(blob)
                                         t = (companies[i]["id"], companies[j]["id"], blob, len(seqvec),)
                                         c.execute("INSERT INTO `data` (`basecid`, `targetcid`, `seqvec`, `len`) VALUES (?, ?, ?, ?)", t)
