@@ -184,7 +184,7 @@ class DataSet:
         wdict["targetcompanyplaceholder"] = 1
         wdict["<PAD>"] = 2
         self.conn.commit()
-        for f in glob.glob(self.datafolder + "*.txt"):
+        for f in glob.glob(self.datafolder + "/*.txt"):
             print("Processing file " + f + "...\n")
             datafile = open(f)   
             for line in datafile:
@@ -255,12 +255,12 @@ class DataSet:
                 t = (basecid,)
                 c.execute("SELECT `name` FROM `companies` WHERE `cid` = ?", t)
                 result = c.fetchone()
-                words.append(result[0])
+                words.append("[<[" + result[0] + "]>]")
             elif wid == 1:
                 t = (targetcid,)
                 c.execute("SELECT `name` FROM `companies` WHERE `cid` = ?", t)
                 result = c.fetchone()
-                words.append(result[0])
+                words.append("[<[" + result[0] + "]>]")
             else:
                 t = (wid,)
                 c.execute("SELECT `word` FROM `vocab` WHERE `wid` = ?", t)
