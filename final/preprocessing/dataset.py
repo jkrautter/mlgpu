@@ -244,15 +244,28 @@ class DataSet:
     def getStringRepresentationFor(self, did):
         t = (did,)
         c = self.conn.cursor()
-        c.execute("SELECT `seqvec` FROM `data` WHERE `id` = ?", t)
+        c.execute("SELECT `basecid`, `targetcid`, `seqvec` FROM `data` WHERE `id` = ?", t)
         result = c.fetchone()
-        seqvec = pickle.loads(result[0])
+        seqvec = pickle.loads(result[2])
+        basecid = int(result[0])
+        targetcid = int(result[1])
         words = []
         for wid in seqvec:
-            t = (wid,)
-            c.execute("SELECT `word` FROM `vocab` WHERE `wid` = ?", t)
-            result = c.fetchone()
-            words.append(result[0])
+            if wid == 0:
+                t = (basecid,)
+                c.execute("SELECT `name` FROM `companies` WHERE `cid` = ?", t)
+                result = c.fetchone()
+                words.append(result[0])
+            elif wid == 1:
+                t = (targetcid,)
+                c.execute("SELECT `name` FROM `companies` WHERE `cid` = ?", t)
+                result = c.fetchone()
+                words.append(result[0])
+            else:
+                t = (wid,)
+                c.execute("SELECT `word` FROM `vocab` WHERE `wid` = ?", t)
+                result = c.fetchone()
+                words.append(result[0])
         return str(words)
     
     def getVocabSize(self):
