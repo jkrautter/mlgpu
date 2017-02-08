@@ -53,3 +53,13 @@ class Mahalanobis:
                 S[i][j] = S[i][j] / (self.n - 1)
         S_inv = np.linalg.inv(S)
         self.d_S_inv = self.thr.to_device(S_inv)
+    
+    def computeDistance(self, x, y):
+        mul = reikna.linalg.MatrixMul(self.d_S_inv, y, transposed_b=True)
+        mulc = mul.compile(self.thr)
+        d_temp = mulc(self.d_S_inv, y)
+        mul = reikna.linalg.MatrixMul(x, d_temp)
+        mulc = mul.compile(self.thr)
+        d_res = mulc(x, d_temp)
+        res = d_res.get()
+        print(str(res))
