@@ -18,7 +18,7 @@ class SentimentModel(object):
 	def __init__(self, vocab_size, hidden_size, dropout,
 	num_layers, max_gradient_norm, max_seq_length,
 	learning_rate, lr_decay,batch_size, forward_only=False):
-		self.num_classes = 16356 
+		self.num_classes = 6507 
 		self.vocab_size = vocab_size
 		self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
 		self.learning_rate_decay_op = self.learning_rate.assign(
