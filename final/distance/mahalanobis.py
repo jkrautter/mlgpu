@@ -21,6 +21,13 @@ class Mahalanobis:
         self.num = data.shape[0]
         self.n = data.shape[1]
         self.computeInvCovMatrix()
+        self.d_diff = self.thr.array((self.n, ), dtype=np.float32)
+        self.d_temp = self.thr.array((self.n, 1), dtype=np.float32)
+        mul1 = reikna.linalg.MatrixMul(self.d_S_inv, self.d_diff, out_arr=self.d_temp, transposed_b=True)
+        self.dmul1c = mul1.compile(self.thr)
+        self.d_res = self.thr.array((1, 1), dtype=np.float32)
+        mul2 = reikna.linalg.MatrixMul(self.d_diff, self.d_temp, out_arr=self.d_res)
+        self.dmul2c = mul2.compile(self.thr)
         
     def computeInvCovMatrix(self):
         means = np.zeros(self.n, dtype=np.float32)
@@ -58,17 +65,10 @@ class Mahalanobis:
     
     def computeDistance(self, x, y):
         diff = np.array([np.subtract(x, y)])
-        d_diff = self.thr.to_device(diff)
-        d_temp = self.thr.array((y.shape[0], 1), dtype=np.float32)
-        mul = reikna.linalg.MatrixMul(self.d_S_inv, d_diff, out_arr=d_temp, transposed_b=True)
-        mulc = mul.compile(self.thr)
-        mulc(d_temp, self.d_S_inv, d_diff)
-        
-        d_res = self.thr.array((1, 1), dtype=np.float32)
-        mul = reikna.linalg.MatrixMul(d_diff, d_temp, out_arr=d_res)
-        mulc = mul.compile(self.thr)
-        mulc(d_res, d_diff, d_temp)
-        res = d_res.get()
+        self.thr.to_device(diff, dest=self.d_diff)
+        self.dmul1c(self.d_temp, self.d_S_inv, self.d_diff)
+        self.dmul2c(self.d_res, self.d_diff, self.d_temp)
+        res = self.d_res.get()
         
         return math.sqrt(res[0][0])
     
